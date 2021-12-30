@@ -1,1 +1,3 @@
 falcon==3.0.1
+PyGithub==1.55
+pyserde==0.6.0
