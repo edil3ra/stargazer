@@ -22,14 +22,14 @@ class AuthMiddleware:
         token = req.get_header('Authorization')
 
         if token is None:
-            description = ('Please provide an auth token '
-                           'as part of the request.')
+            description = ('Please provide your github token '
+                           'as part of the request '
+                           'ex: Authorization:{your_github_token}')
 
             raise falcon.HTTPUnauthorized(title='Auth token required', description=description)
 
         if not self._token_is_valid(token):
-            description = ('The provided auth token is not valid. '
-                           'Please request a new token and try again.')
+            description = ('The provided auth token is not valid. ')
 
             raise falcon.HTTPUnauthorized(title='Authentication required', description=description)
 
@@ -38,8 +38,7 @@ class AuthMiddleware:
 
 
 def build_app():
-    # app = falcon.App(middleware=[AuthMiddleware()])
-    app = falcon.App()
+    app = falcon.App(middleware=[AuthMiddleware()])
     stars = StarNeighbours()
     app.add_route('/repos/{user}/starneighbours', stars)
     return app
