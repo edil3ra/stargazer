@@ -8,27 +8,10 @@ from github import Github
 from github.Repository import Repository
 from github.NamedUser import NamedUser
 from github.PaginatedList import PaginatedList
-
-
 from serde import serialize, deserialize
 from serde.json import from_json, to_json
 
-
-@deserialize
-@serialize
-@dataclass
-class Stargazer:
-    name: str
-    count: int
-
-
-@deserialize
-@serialize
-@dataclass
-class RepoStargazer:
-    repo: str
-    stargazers: List[Stargazer]
-
+from models import Stargazer, RepoStargazer
 
 @dataclass
 class StargazerGithub:
@@ -38,11 +21,28 @@ class StargazerGithub:
     _common_stargazers_counted: Dict[str, int]
     _repos_stargazers_by_user: Dict[str, List[RepoStargazer]] # very simple caching system, in a real project I would used something more powerfull and decoupled it from the class
     
-    def __init__(self, github: Github):
-        self.client: Github = github
+    def __init__(self):
+        self.client: typing.Optional[Github] = None
         self._repos_stargazers_by_user = {}
+    def connect(self, token: str):
+        self.client = Github(token)
 
-    def get_repos_with_common_stargazers(self, user: str):
+    def is_authenticated(self) -> bool:
+        # let the Github client raise an error when the client is anonymous
+        # probably a terrible way to test it
+        if self.client is None:
+            raise Exception('client is empty, you need to connect first')
+        try:
+            self.user = self.client.get_user().login
+        except:
+            return False
+        return True
+        
+    def get_repos_with_common_stargazers(self):
+        if self.client is None:
+            raise Exception('client is empty, you need to connect first')
+        
+        user = self.client.get_user().login
         if not user in self._repos_stargazers_by_user:
             self._build(user)
         return self._repos_stargazers_by_user[user]
@@ -57,6 +57,8 @@ class StargazerGithub:
             ._build_repos_stargazers(user)
     
     def _build_repos_from_user(self, user: str):
+        if self.client is None:
+            raise Exception('client is empty, you need to connect first')
         self._repos = list(self.client.get_user(user).get_repos())
         return self
     
@@ -80,5 +82,9 @@ class StargazerGithub:
                     count = self._common_stargazers_counted[stargazer] - 1
                     common_stargazer = Stargazer(stargazer, count)
                     common_stargazers.append(common_stargazer)
-            repo_stargazer = RepoStargazer(repo.name, common_stargazers)
-            self._repos_stargazers_by_user[user].append(repo_stargazer)
+            if len(common_stargazers) > 0:
+                repo_stargazer = RepoStargazer(
+                    repo.name,
+                    sorted(common_stargazers, key=lambda stargazer: stargazer.count, reverse=True)
+                )
+                self._repos_stargazers_by_user[user].append(repo_stargazer)
